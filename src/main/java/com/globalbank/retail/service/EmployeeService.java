@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -14,6 +15,8 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -22,10 +25,14 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.globalbank.retail.entity.AccountType;
 import com.globalbank.retail.entity.Customer;
+import com.globalbank.retail.entity.InternalUser;
+import com.globalbank.retail.entity.LoginRequest;
 import com.globalbank.retail.entity.Statement;
 import com.globalbank.retail.entity.Transaction;
+import com.globalbank.retail.helper.JwtTokenHelper;
 import com.globalbank.retail.repo.AccountTypeRepository;
 import com.globalbank.retail.repo.CustomerRepository;
+import com.globalbank.retail.repo.InternalUserRepository;
 import com.globalbank.retail.repo.TransactionRepository;
 import com.itextpdf.text.BaseColor;
 import com.itextpdf.text.Chunk;
@@ -41,19 +48,23 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class EmployeeService {
 	CustomerRepository custRepo;
+	InternalUserRepository internalRepo;
 	AccountTypeRepository accRepo;
 	TransactionRepository transRepo;
+	JwtTokenHelper jwtTokenHelper;
+	ObjectMapper mapper;
 
-	public EmployeeService(CustomerRepository custRepo, TransactionRepository transRepo,
-			AccountTypeRepository accRepo) {
+	public EmployeeService(CustomerRepository custRepo, InternalUserRepository internalRepo,
+			TransactionRepository transRepo, AccountTypeRepository accRepo, JwtTokenHelper jwtTokenHelper) {
 		this.custRepo = custRepo;
 		this.accRepo = accRepo;
 		this.transRepo = transRepo;
+		this.jwtTokenHelper = jwtTokenHelper;
+		this.internalRepo = internalRepo;
+		mapper = new ObjectMapper();
 	}
 
 	public ResponseEntity<String> createAccountTypes(HttpServletRequest request) {
-
-		ObjectMapper mapper = new ObjectMapper();
 		AccountType[] requestPayload;
 		request.getHeader("x-jwt-auth");
 
@@ -75,10 +86,7 @@ public class EmployeeService {
 	}
 
 	public ResponseEntity<String> createCustomer(HttpServletRequest request) {
-
-		ObjectMapper mapper = new ObjectMapper();
 		Customer requestPayload;
-		request.getHeader("x-jwt-auth");
 
 		try {
 			requestPayload = mapper.readValue(request.getReader(), Customer.class);
@@ -93,14 +101,11 @@ public class EmployeeService {
 		}
 
 		custRepo.save(requestPayload);
-		return new ResponseEntity<String>("Successfully upserted accounttype : ", HttpStatus.OK);
+		return new ResponseEntity<String>("Successfully created customer : " + requestPayload.id, HttpStatus.OK);
 	}
 
 	public ResponseEntity<String> linkCustomerToAccountType(HttpServletRequest request) {
-		ObjectMapper mapper = new ObjectMapper();
 		Customer requestPayload;
-		request.getHeader("x-jwt-auth");
-
 		try {
 			requestPayload = mapper.readValue(request.getReader(), Customer.class);
 
@@ -139,7 +144,6 @@ public class EmployeeService {
 	}
 
 	public ResponseEntity<String> getCustomerDetails(HttpServletRequest request) {
-		request.getHeader("x-jwt-auth");
 		String custId = request.getHeader("entity_id");
 		Optional<Customer> cust = custRepo.findById(custId);
 		if (cust.isEmpty()) {
@@ -147,7 +151,9 @@ public class EmployeeService {
 					"Error while processing request . Customer not found in system :" + custId, HttpStatus.BAD_REQUEST);
 		} else {
 			Customer customer = cust.get();
-			return new ResponseEntity<String>(customer.toString(), HttpStatus.OK);
+			String customerDetails = "Firstname : ".concat(customer.firstName).concat("   Lastname :")
+					.concat(customer.lastName).concat("   Balance :").concat(customer.balance);
+			return new ResponseEntity<String>(customerDetails, HttpStatus.OK);
 		}
 
 	}
@@ -166,7 +172,6 @@ public class EmployeeService {
 	}
 
 	public ResponseEntity<String> fetchAccountBalanceForCustomer(HttpServletRequest request) {
-		request.getHeader("x-jwt-auth");
 		String custId = request.getHeader("entity_id");
 		Optional<Customer> cust = custRepo.findById(custId);
 		if (cust.isEmpty()) {
@@ -179,7 +184,6 @@ public class EmployeeService {
 	}
 
 	public ResponseEntity<String> transferMoney(HttpServletRequest request) {
-		ObjectMapper mapper = new ObjectMapper();
 		Transaction requestPayload;
 		try {
 			requestPayload = mapper.readValue(request.getReader(), Transaction.class);
@@ -222,7 +226,7 @@ public class EmployeeService {
 	}
 
 	private void rollbackTransactions() {
-		// TODO Auto-generated method stub
+		// TODO Need to write proper rollback strategy
 
 	}
 
@@ -235,23 +239,30 @@ public class EmployeeService {
 	}
 
 	private void updateCustomerTable(Customer currentSourceEntity, Customer currentDestinationEntity) {
-
+		// TODO update the balance of the source and destination account
 	}
 
 	public ResponseEntity<String> printAccountStatement(HttpServletRequest request) {
-		ObjectMapper mapper = new ObjectMapper();
 		Statement requestPayload;
 		try {
 			requestPayload = mapper.readValue(request.getReader(), Statement.class);
-			Date date=new SimpleDateFormat("yyyy-mm-dd hh:mm:ss").parse(requestPayload.fromDate);  
-			List<Transaction> transactions=transRepo.findCustomerStatementFrom(requestPayload.customerId, date);
-			
+			Date date = new SimpleDateFormat("yyyy-mm-dd hh:mm:ss").parse(requestPayload.fromDate);
+			List<Transaction> transactions = transRepo.findCustomerStatementFrom(requestPayload.customerId, date);
+
 			Document document = new Document();
 			PdfWriter.getInstance(document, new FileOutputStream(requestPayload.customerId.concat(".pdf")));
 
 			document.open();
 			Font font = FontFactory.getFont(FontFactory.COURIER, 16, BaseColor.BLACK);
-			Chunk chunk = new Chunk(transactions.toString(), font);
+
+			String transactionString = "";
+			for (Transaction transaction : transactions) {
+				transactionString = transactionString.concat("  From account:").concat(transaction.fromCustomerId)
+						.concat(" To account:")
+						.concat(transaction.toCustomerId.concat("  Amount :").concat(transaction.amount).concat("\n"));
+			}
+
+			Chunk chunk = new Chunk(transactionString, font);
 
 			document.add(chunk);
 			document.close();
@@ -272,13 +283,41 @@ public class EmployeeService {
 	}
 
 	public String calculateAndUpdateBalanceWithInterest(HttpServletRequest request) {
-		// TODO Auto-generated method stub
 		return null;
 	}
 
-	public void logon(HttpServletRequest request) {
-		//generateToken
-		
+	public ResponseEntity<String> logon(HttpServletRequest request) {
+		LoginRequest requestPayload = null;
+		InternalUser internalUser = null;
+		try {
+			requestPayload = mapper.readValue(request.getReader(), LoginRequest.class);
+		} catch (IOException e) {
+			return new ResponseEntity<String>("Error while processing payload", HttpStatus.BAD_REQUEST);
+		}
+
+		Optional<InternalUser> internalUserOptional = internalRepo.findById(requestPayload.customerId);
+
+		if (internalUserOptional.isPresent()) {
+			internalUser = internalUserOptional.get();
+		} else {
+			return new ResponseEntity<String>("Employee not found !", HttpStatus.BAD_REQUEST);
+		}
+
+		if (internalUser.userType != null && internalUser.userType.equalsIgnoreCase("Employee")) {
+
+			UserDetails userDetail = new User(internalUser.userName, "dummyPWD", new ArrayList<>());
+
+			String jwt = jwtTokenHelper.generateToken(userDetail);
+			internalUser.session = jwt;
+			internalRepo.save(internalUser);
+
+			return new ResponseEntity<String>("Use this JWt for future  API calls for this Employee  :  " + jwt,
+					HttpStatus.OK);
+
+		} else {
+			return new ResponseEntity<String>("Error while processing payload or user doesnt have authority",
+					HttpStatus.BAD_REQUEST);
+		}
 	}
 
 }

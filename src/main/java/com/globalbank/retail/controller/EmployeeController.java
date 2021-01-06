@@ -20,10 +20,9 @@ public class EmployeeController {
 		this.service = service;
 	}
 
-	@RequestMapping(path = "/logon", method = RequestMethod.GET)
-	public String logon(HttpServletRequest request) {
-		service.logon(request);
-		return null;
+	@PostMapping(path = "/logon")
+	public ResponseEntity<String> logon(HttpServletRequest request) {
+		return service.logon(request);
 	}
 
 	/* This endpoint will add the different types of account to system */
@@ -54,13 +53,13 @@ public class EmployeeController {
 		return service.getCustomerDetails(request);
 	}
 
-	@PostMapping(path = "/customer/delete")
+	@GetMapping(path = "/customer/delete")
 	public ResponseEntity<String> deleteCustomer(HttpServletRequest request) {
 		
 		return service.deleteCustomer(request);
 	}
 
-	@PostMapping(path = "/customer/account/balance")
+	@GetMapping(path = "/customer/account/balance")
 	public ResponseEntity<String> fetchAccountBalanceForCustomer(HttpServletRequest request) {
 		
 		return service.fetchAccountBalanceForCustomer(request);
@@ -84,6 +83,5 @@ public class EmployeeController {
 		return service.calculateAndUpdateBalanceWithInterest(request);
 	}
 
-	// Print Account statement of an account for a time range in pdf.
 
 }

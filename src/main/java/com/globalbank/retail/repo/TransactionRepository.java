@@ -10,6 +10,6 @@ import com.globalbank.retail.entity.Transaction;
 
 public interface TransactionRepository extends MongoRepository<Transaction, String> {
 	
-	@Query("{'toCustomerId' : ?0 , 'date' : ?1}")
+	@Query("{'fromCustomerId' : ?0 , 'date'  :{$gt: ?1} }")
 	List findCustomerStatementFrom(String custId, Date from);
 }

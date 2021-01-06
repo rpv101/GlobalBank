@@ -8,7 +8,7 @@ import lombok.Data;
 public class InternalUser {
 
 	@Id
-	public String id;
+	public String userName;
 	public String firstName;
 	public String lastName;
 	public String email;
