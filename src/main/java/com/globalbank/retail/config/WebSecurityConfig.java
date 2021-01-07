@@ -24,9 +24,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 
 	@Autowired
-	private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
-
-	@Autowired
 	private UserDetailsService jwtUserDetailsService;
 
 	@Autowired
@@ -34,9 +31,6 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 
 	@Autowired
 	public void configureGlobal(AuthenticationManagerBuilder auth) throws Exception {
-		// configure AuthenticationManager so that it knows from where to load
-		// user for matching credentials
-		// Use BCryptPasswordEncoder
 		auth.userDetailsService(jwtUserDetailsService).passwordEncoder(passwordEncoder());
 	}
 
@@ -55,30 +49,17 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 	protected void configure(HttpSecurity httpSecurity) throws Exception {
 		httpSecurity = httpSecurity.cors().and().csrf().disable();
 
-	        // Setting session management to stateless
-		httpSecurity = httpSecurity
-	            .sessionManagement()
-	            .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-	            .and();
+		// Setting session management to stateless
+		httpSecurity = httpSecurity.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS).and();
 
-	        // Set unauthorized requests exception handler
-		httpSecurity = httpSecurity
-	            .exceptionHandling()
-	            .authenticationEntryPoint(
-	                (request, response, ex) -> {
-	                    response.sendError(
-	                        HttpServletResponse.SC_UNAUTHORIZED,
-	                        ex.getMessage()
-	                    );
-	                }
-	            )
-	            .and();
+		// Set unauthorized requests exception handler
+		httpSecurity = httpSecurity.exceptionHandling().authenticationEntryPoint((request, response, ex) -> {
+			response.sendError(HttpServletResponse.SC_UNAUTHORIZED, ex.getMessage());
+		}).and();
 
-	        // bypassing the logon  endpoints from JWT
-		httpSecurity.authorizeRequests()
-	            .antMatchers(HttpMethod.POST, "/admin/logon").permitAll()
-	            .antMatchers(HttpMethod.POST, "/employee/logon").permitAll()
-	            .anyRequest().authenticated();
+		// bypassing the logon endpoints from JWT
+		httpSecurity.authorizeRequests().antMatchers(HttpMethod.POST, "/admin/logon").permitAll()
+				.antMatchers(HttpMethod.POST, "/employee/logon").permitAll().anyRequest().authenticated();
 
 		// Add a filter to validate the tokens with every request
 		httpSecurity.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);

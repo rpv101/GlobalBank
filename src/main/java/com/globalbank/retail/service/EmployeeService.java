@@ -2,7 +2,6 @@ package com.globalbank.retail.service;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -10,6 +9,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.logging.Logger;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -47,6 +47,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Service
 public class EmployeeService {
+	static Logger log = Logger.getLogger(AdminService.class.getName());
 	CustomerRepository custRepo;
 	InternalUserRepository internalRepo;
 	AccountTypeRepository accRepo;
@@ -66,17 +67,19 @@ public class EmployeeService {
 
 	public ResponseEntity<String> createAccountTypes(HttpServletRequest request) {
 		AccountType[] requestPayload;
-		request.getHeader("x-jwt-auth");
 
 		try {
 			requestPayload = mapper.readValue(request.getReader(), AccountType[].class);
 
 		} catch (JsonMappingException e) {
+			log.warning("Error while mapping the json string to entity");
 			return new ResponseEntity<String>("Error while processing payload", HttpStatus.BAD_REQUEST);
 
 		} catch (JsonProcessingException e) {
+			log.warning("Error while processing the json string");
 			return new ResponseEntity<String>("Error while processing payload", HttpStatus.BAD_REQUEST);
 		} catch (IOException e) {
+			log.warning("IO exception");
 			return new ResponseEntity<String>("Error while processing payload", HttpStatus.BAD_REQUEST);
 		}
 		for (AccountType accType : requestPayload) {
@@ -110,11 +113,14 @@ public class EmployeeService {
 			requestPayload = mapper.readValue(request.getReader(), Customer.class);
 
 		} catch (JsonMappingException e) {
+			log.warning("Error while mapping the json string to entity");
 			return new ResponseEntity<String>("Error while processing payload", HttpStatus.BAD_REQUEST);
 
 		} catch (JsonProcessingException e) {
+			log.warning("Error while processing the json string");
 			return new ResponseEntity<String>("Error while processing payload", HttpStatus.BAD_REQUEST);
 		} catch (IOException e) {
+			log.warning("IO exception");
 			return new ResponseEntity<String>("Error while processing payload", HttpStatus.BAD_REQUEST);
 		}
 		String custId = requestPayload.id;
@@ -159,7 +165,6 @@ public class EmployeeService {
 	}
 
 	public ResponseEntity<String> deleteCustomer(HttpServletRequest request) {
-		request.getHeader("x-jwt-auth");
 		String custId = request.getHeader("entity_id");
 		Optional<Customer> cust = custRepo.findById(custId);
 		if (cust.isEmpty()) {
@@ -189,11 +194,14 @@ public class EmployeeService {
 			requestPayload = mapper.readValue(request.getReader(), Transaction.class);
 
 		} catch (JsonMappingException e) {
+			log.warning("Error while mapping the json string to entity");
 			return new ResponseEntity<String>("Error while processing payload", HttpStatus.BAD_REQUEST);
 
 		} catch (JsonProcessingException e) {
+			log.warning("Error while processing the json string");
 			return new ResponseEntity<String>("Error while processing payload", HttpStatus.BAD_REQUEST);
 		} catch (IOException e) {
+			log.warning("IO exception");
 			return new ResponseEntity<String>("Error while processing payload", HttpStatus.BAD_REQUEST);
 		}
 
@@ -210,19 +218,20 @@ public class EmployeeService {
 
 	private ResponseEntity<String> updateTransactions(Transaction requestPayload) {
 		try {
+			//TODO check whether balance is available in source account
 			Customer currentSourceEntity = custRepo.findById(requestPayload.fromCustomerId).get();
 			Customer currentDestinationEntity = custRepo.findById(requestPayload.toCustomerId).get();
 
 			if (null != currentSourceEntity && null != currentDestinationEntity) {
 				updateTransactionTable(requestPayload);
-				updateCustomerTable(currentSourceEntity, currentDestinationEntity);
+				updateCustomerTable(currentSourceEntity, currentDestinationEntity, requestPayload.amount);
 			} else {
 				return new ResponseEntity<String>("Source or destination account not found", HttpStatus.BAD_REQUEST);
 			}
 		} catch (Exception e) {
 			rollbackTransactions();
 		}
-		return new ResponseEntity<String>("Transaction succesfull", HttpStatus.OK);
+		return new ResponseEntity<String>("Transaction succesful", HttpStatus.OK);
 	}
 
 	private void rollbackTransactions() {
@@ -232,14 +241,23 @@ public class EmployeeService {
 
 	private void updateTransactionTable(Transaction requestPayload) {
 		Date date = Calendar.getInstance().getTime();
-		DateFormat dateFormat = new SimpleDateFormat("yyyy-mm-dd hh:mm:ss");
 		requestPayload.date = date;
 		requestPayload.transactionType = "Debit";
 		transRepo.save(requestPayload);
 	}
 
-	private void updateCustomerTable(Customer currentSourceEntity, Customer currentDestinationEntity) {
-		// TODO update the balance of the source and destination account
+	private void updateCustomerTable(Customer currentSourceEntity, Customer currentDestinationEntity, String amt) {
+		if (!StringUtils.isEmpty(currentSourceEntity.balance) && !StringUtils.isEmpty(amt)) {
+			currentSourceEntity.balance = String
+					.valueOf(Double.valueOf(currentSourceEntity.balance) - Double.valueOf(amt));
+		}
+		if (!StringUtils.isEmpty(currentDestinationEntity.balance) && !StringUtils.isEmpty(amt)) {
+			currentDestinationEntity.balance = String
+					.valueOf(Double.valueOf(currentDestinationEntity.balance) + Double.valueOf(amt));
+		}
+		custRepo.save(currentSourceEntity);
+		custRepo.save(currentDestinationEntity);
+
 	}
 
 	public ResponseEntity<String> printAccountStatement(HttpServletRequest request) {
@@ -263,16 +281,18 @@ public class EmployeeService {
 			}
 
 			Chunk chunk = new Chunk(transactionString, font);
-
 			document.add(chunk);
 			document.close();
 
 		} catch (JsonMappingException e) {
-			return new ResponseEntity<String>("Error while mapping JSON payload", HttpStatus.BAD_REQUEST);
+			log.warning("Error while mapping the json string to entity");
+			return new ResponseEntity<String>("Error while processing payload", HttpStatus.BAD_REQUEST);
 
 		} catch (JsonProcessingException e) {
-			return new ResponseEntity<String>("Error while processing JSON payload", HttpStatus.BAD_REQUEST);
+			log.warning("Error while processing the json string");
+			return new ResponseEntity<String>("Error while processing payload", HttpStatus.BAD_REQUEST);
 		} catch (IOException e) {
+			log.warning("IO exception");
 			return new ResponseEntity<String>("Error while processing payload", HttpStatus.BAD_REQUEST);
 		} catch (ParseException e) {
 			return new ResponseEntity<String>("Error while parsing date", HttpStatus.BAD_REQUEST);
@@ -311,7 +331,7 @@ public class EmployeeService {
 			internalUser.session = jwt;
 			internalRepo.save(internalUser);
 
-			return new ResponseEntity<String>("Use this JWt for future  API calls for this Employee  :  " + jwt,
+			return new ResponseEntity<String>("Use this JWT for future  API calls for this Employee  :  " + jwt,
 					HttpStatus.OK);
 
 		} else {

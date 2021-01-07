@@ -15,6 +15,7 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.globalbank.retail.constants.GlobalbankConstants;
 import com.globalbank.retail.helper.JwtTokenHelper;
 import com.globalbank.retail.service.JwtUserDetailsService;
 
@@ -32,9 +33,9 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
 			throws ServletException, IOException {
-		
+		boolean isJWTexpired= false;
 
-		final String jwtToken = request.getHeader("x-auth-jwt");
+		final String jwtToken = request.getHeader(GlobalbankConstants.X_AUT_JWT);
 
 		String username = null;
 
@@ -44,6 +45,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 			} catch (IllegalArgumentException e) {
 				logger.error("Unable to get JWT Token");
 			} catch (ExpiredJwtException e) {
+				isJWTexpired=true;
 				logger.error("JWT Token has expired");
 			}catch (Exception e) {
 				logger.error("An error occured");
@@ -52,7 +54,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 			logger.warn("JWT Token is empty");
 		}
 
-		if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+		if (!isJWTexpired && username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
 			UserDetails userDetails = this.jwtUserDetailsService.loadUserByUsername(username);
 

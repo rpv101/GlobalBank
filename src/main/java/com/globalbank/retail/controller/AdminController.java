@@ -2,6 +2,14 @@ package com.globalbank.retail.controller;
 
 import javax.servlet.http.HttpServletRequest;
 
+/*This controller is for all activities related to 
+ * Global bank Retail section admins only
+ * All requests are authenticated via JWT
+ * Login request will generate a JWT which can be used for consequent requests.
+ * Currently Password is not used for validation. Only user name is checked in  DB when a user tries to login
+ *  
+ *  */
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;

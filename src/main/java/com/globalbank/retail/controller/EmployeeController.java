@@ -11,6 +11,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.globalbank.retail.service.EmployeeService;
 
+/*This controller is for all activities related to 
+ * Global bank Retail section Employees only. 
+ * All requests are authenticated via JWT
+ * Login request will generate a JWT which can be used for consequent requests.
+ * Currently Password is not used for validation. Only user name is checked in  DB when a user tries to login
+ *  
+ *  */
+
 @RestController()
 @RequestMapping("/employee")
 public class EmployeeController {

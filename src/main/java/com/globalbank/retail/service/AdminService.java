@@ -2,6 +2,7 @@ package com.globalbank.retail.service;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.logging.Logger;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -20,12 +21,13 @@ import com.globalbank.retail.entity.LoginRequest;
 import com.globalbank.retail.helper.JwtTokenHelper;
 import com.globalbank.retail.repo.InternalUserRepository;
 
-import jdk.internal.org.jline.utils.Log;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
 public class AdminService {
+	static Logger log = Logger.getLogger(AdminService.class.getName());  
+	
 	InternalUserRepository repo;
 	ObjectMapper mapper;
 	JwtTokenHelper jwtTokenHelper;
@@ -40,20 +42,19 @@ public class AdminService {
 	public ResponseEntity<String> create(HttpServletRequest request) {
 
 		InternalUser requestPayload;
-		request.getHeader("x-jwt-auth");
 
 		try {
 			requestPayload = mapper.readValue(request.getReader(), InternalUser.class);
 
 		} catch (JsonMappingException e) {
-			//Log.error("Error while mapping the json string to entity");
+			log.warning("Error while mapping the json string to entity");
 			return new ResponseEntity<String>("Error while processing payload", HttpStatus.BAD_REQUEST);
 
 		} catch (JsonProcessingException e) {
-			//Log.error("Error while processing the json string");
+			log.warning("Error while processing the json string");
 			return new ResponseEntity<String>("Error while processing payload", HttpStatus.BAD_REQUEST);
 		} catch (IOException e) {
-			//Log.error("IO exception");
+			log.warning("IO exception");
 			return new ResponseEntity<String>("Error while processing payload", HttpStatus.BAD_REQUEST);
 		}
 		repo.save(requestPayload);
@@ -86,7 +87,7 @@ public class AdminService {
 			internalUser.session = jwt;
 			repo.save(internalUser);
 
-			return new ResponseEntity<String>("Use this JWt for future  API calls for this Employee   :  " + jwt,
+			return new ResponseEntity<String>("Use this JWt for future  API calls for this Admin   :  " + jwt,
 					HttpStatus.OK);
 
 		} else {
