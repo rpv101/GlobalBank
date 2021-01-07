@@ -6,3 +6,7 @@ Data model:
 
 Collections : InternalUser , transaction,accountType, customer
 
+
+PREREQUISITE
+
+Mongo DB need to be installed in system and it should be up 
