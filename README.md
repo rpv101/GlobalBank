@@ -10,3 +10,18 @@ Collections : InternalUser , transaction,accountType, customer
 PREREQUISITE
 
 Mongo DB need to be installed in system and it should be up 
+
+Execute the below queries
+
+
+use globalbank;
+
+db.internalUser.insert({
+ "_id":"adm_1",
+"userName":"adm_1",
+ "firstName":"abc",
+ "lastName":"xyz",
+ "email":"abc@abc.com",
+ "mobile":"88888888",
+"userType":"Admin"
+})
